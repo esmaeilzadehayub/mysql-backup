@@ -1,0 +1,53 @@
+
+#!/bin/bash
+
+IP=
+PORT=
+ZABBIX=
+KEY=trap
+DATE=$(date +"%m-%d-%Y")
+DIR=/var/lib/mysql/backup/
+SRC=/var/lib/mysql
+RETENTION=$(date --date="1 days ago" +"%m-%d-%Y")
+CALL="$MYSQL_HOME"
+
+
+
+backup() {
+  BACKUP_LOG=$(MYSQL_HOME=$DIR;xtrabackup --backup  --compress  --compress-threads=4 --datadir=$SRC --target-dir=$DIR$DATE 2>&1  )
+   if [ $? -eq 0 ]
+    then
+           exit 0
+  else
+     MSG="Error in creating CSDB backup"
+     zabbix_sender -z $IP -p $PORT -s "$ZABBIX" -k $KEY -o "$MSG"
+     exit 1
+  fi
+
+}
+Create=$( mkdir $DIR$DATE )
+if [ -e $Create  ]
+then
+
+  LOG="$DIR$RETENTION"
+  if [ -e $LOG  ]
+  then
+     Rm_log=$(rm -rf "$DIR$RETENTION" 2>&1 )
+     if  [ $? -eq 0 ]
+     then 
+        backup
+        exit 0
+     else
+       MSG="Removing old backup files failed"
+       zabbix_sender -z $IP -p $PORT -s "$ZABBIX" -k $KEY -o "$MSG"
+       exit 1
+     fi
+  else 
+    backup
+   exit 1
+  fi
+else
+  MSG="No Create Directory $DIR"
+  zabbix_sender -z $IP -p $PORT -s "$ZABBIX" -k $KEY -o "$MSG"
+  exit 1
+fi
